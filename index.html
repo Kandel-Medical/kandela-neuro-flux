@@ -167,7 +167,7 @@
 
     <div id="ui-layer">
         <div>
-            <h1>NEURO-FLUX <span style="font-size:0.6em; vertical-align: super; opacity:0.7">v2.2 (Stable)</span></h1>
+            <h1>NEURO-FLUX <span style="font-size:0.6em; vertical-align: super; opacity:0.7">v2.4 (Stable)</span></h1>
             <div class="subtitle" id="level-title">Carregando Módulos...</div>
         </div>
         <div class="stats">
@@ -194,9 +194,10 @@
 
 <script>
 /**
- * NEURO-FLUX v2.2 - "Solvable Guarantee"
+ * NEURO-FLUX v2.4
  * Correção Crítica: Algoritmo de "Multi-Agent Growth" para garantir
  * que todo nível gerado tenha solução de 100% de preenchimento.
+ * + Correção de vírgulas nos arrays de pares.
  */
 
 const canvas = document.getElementById('gameCanvas');
@@ -226,25 +227,25 @@ const THEMES = [
             ['#FF8800', 'Tibial', 'AH'],      // Laranja
             ['#FF0055', 'Femoral', 'Quad'],   // Vermelho
             ['#00FF9D', 'H-Reflex', 'Gastroc'],// Verde
-            ['#00CCFF', 'Ciático', 'Isquiotibiais']  // Azul
+            ['#00CCFF', 'Ciático', 'Isquio']  // Azul (Abreviado para caber)
         ]
     },
     {
         name: "MNIO Facial: Músculos e Nervos",
         pairs: [
             ['#BD00FF', 'Frontal', 'Temporal'],    // Roxo
-            ['#FF8800', 'OrbOculi', 'Zigomático'],      // Laranja
+            ['#FF8800', 'OrbOculi', 'Zigomát.'],      // Laranja
             ['#FF0055', 'OrbOris', 'Bucal'],   // Vermelho
             ['#00FF9D', 'Mentual', 'Marginal'],// Verde
-            ['#00CCFF', 'Trapézio', 'Acessório']  // Azul
+            ['#00CCFF', 'Trapézio', 'XI Par']  // Azul
         ]
     },
     {
         name: "PESS MS",
         pairs: [
             ['#BD00FF', 'Estímulo', 'Mediano'],    // Roxo
-            ['#FF8800', 'PtoErb', 'Perif'],      // Laranja
-            ['#FF0055', 'Cerv', 'Espinhal'],   // Vermelho
+            ['#FF8800', 'PtoErb', 'Perif.'],      // Laranja (N9)
+            ['#FF0055', 'Cerv', 'Espinhal'],   // Vermelho (N13)
             ['#00FF9D', 'Cp3/Cp4', 'Cortical'], // Verde
             ['#00CCFF', 'N20', 'P23']  // Azul
         ]
@@ -253,30 +254,30 @@ const THEMES = [
         name: "PESS MI",
         pairs: [
             ['#BD00FF', 'Estímulo', 'Tibial'],    // Roxo
-            ['#FF8800', 'FP', 'Perif'],      // Laranja
-            ['#FF0055', 'Lombar', 'Espinhal'],   // Vermelho
-            ['#00FF9D', 'Cpz', 'Cortical'] // Verde
+            ['#FF8800', 'F.Pop', 'Perif.'],      // Laranja
+            ['#FF0055', 'Lombar', 'Espinhal'],   // Vermelho (N22)
+            ['#00FF9D', 'Cpz', 'Cortical'], // Verde
             ['#00CCFF', 'N45', 'P37']  // Azul
         ]
     },
     {
         name: "Testes Comparativos",
         pairs: [
-            ['#BD00FF', 'Mediano', 'Ulnar'],    // Roxo
-            ['#FF8800', 'Mediano', 'Radial'],      // Laranja
+            ['#BD00FF', 'Mediano', 'Ulnar'],    // Roxo (4 dedo)
+            ['#FF8800', 'Mediano', 'Radial'],      // Laranja (1 dedo)
             ['#FF0055', 'IOD', '2-Lumb'],   // Vermelho
-            ['#00FF9D', 'IVdedo', 'Ulnar'] // Verde
-            ['#00CCFF', 'Bactrian', 'Idedo']  // Azul
+            ['#00FF9D', 'IV Dedo', 'Ulnar'], // Verde
+            ['#00CCFF', 'Bactrian', 'I Dedo']  // Azul
         ]
     },
     {
-        name: "Diagnósticos Diferenciais",
+        name: "Diagnósticos Diferenciais EMG",
         pairs: [
             ['#BD00FF', 'STC', 'Mediano'],    // Roxo
-            ['#FF8800', 'Rad', 'Onda-F'],      // Laranja
-            ['#FF0055', 'Miastenia', 'JNM'],   // Vermelho
-            ['#00FF9D', 'TunilCubital', 'Ulnar'] // Verde
-            ['#00CCFF', 'ELA', 'MUNIX']  // Azul
+            ['#FF8800', 'Radicular', 'Reflexo H'],      // Laranja (Ajustado para especificidade S1)
+            ['#FF0055', 'Miastenia', 'Decrem.'],   // Vermelho
+            ['#00FF9D', 'TunelCubital', 'Ulnar'], // Verde (Typo corrigido)
+            ['#00CCFF', 'ELA', 'MUNIX']  // Azul (Excelente!)
         ]
     },
     {
@@ -394,11 +395,6 @@ function startLevel(lvl) {
 
 /**
  * ALGORITMO DE GERAÇÃO ROBUSTO (Multi-Agent Random Walk)
- * 1. Posiciona N agentes (Heads) no grid.
- * 2. Faz eles crescerem simultaneamente para ocupar o espaço vazio.
- * 3. Se o grid encher 100%, o nível é válido.
- * 4. Define as pontas dos caminhos gerados como Start/End.
- * 5. Limpa o "miolo" para o jogador resolver.
  */
 function generateMultiAgentLevel(size, numPairs) {
     gridSize = size;
@@ -478,38 +474,25 @@ function generateMultiAgentLevel(size, numPairs) {
     if (snakeLengths.some(l => l < 3)) return false;
 
     // 5. Transfere Layout para o Grid do Jogo
-    // Precisamos encontrar as "pontas" de cada cluster gerado para serem os endpoints.
-    // O algoritmo acima gera cobras lineares? Não necessariamente, gera árvores.
-    // Para este jogo (Flow), precisamos de caminhos lineares (sem bifurcação).
-    // O método "Worm" simples gera linhas, mas falha em preencher.
-    // O método "Multi-Agent Growth" gera territórios.
-    // Simplificação para MVP: Vamos assumir que a cabeça final e a inicial são os endpoints.
-    // Isso funciona se o caminho não se ramificou. Nosso growth moveu a cabeça, então é linear!
-    // Só precisamos recuperar onde foi o START de cada um.
-    
-    // Recalcula starts (infelizmente perdi no loop acima, vamos reconstruir ou guardar antes)
-    // Ops, heads[] mudou. Vamos guardar starts[] no inicio.
-    
-    // RESTART da lógica com armazenamento correto:
-    // (Para não duplicar código, vou assumir que heads[] agora é o END, preciso do START).
-    // Mas espere, o growth acima é linear simples (cobra que anda). 
-    // O rastro é o corpo. A cabeça move. Então é um caminho único. Perfeito.
-    
-    // Precisamos saber onde COMEÇOU.
-    // Vamos fazer o passo 2 de novo mentalmente:
-    // As posições iniciais em 'available' eram os starts.
-    // Vamos refazer a estrutura para guardar caminhos.
-    
-    return false; // Força retry para usar a função corrigida abaixo (apenas hack estrutural)
+    return transferLayoutToGrid(layout, heads, size, numPairs);
 }
 
-// Função REAIS de Geração (Substituindo a lógica acima dentro da mesma função para clareza)
-// Sobrescrevendo a anterior com a lógica completa:
-generateMultiAgentLevel = function(size, numPairs) {
-    let newGrid = Array(size).fill().map(() => Array(size).fill(-1));
-    let pathsData = Array(numPairs).fill().map(() => []); // Array de coordenadas {r,c}
+// Função auxiliar para converter o Layout gerado em Endpoints
+function transferLayoutToGrid(layout, finalHeads, size, numPairs) {
+    // Como o algoritmo move as cabeças, 'finalHeads' são os END points.
+    // Precisamos encontrar os START points (onde o caminho começou).
+    // Como não guardamos o histórico completo no array layout simples,
+    // precisamos fazer um backtrack a partir da cabeça ou refazer a lógica guardando paths.
     
-    // 1. Escolhe Starts
+    // SOLUÇÃO: Vamos reconstruir o path usando 'layout' + 'finalHeads' via flood fill direcionado?
+    // Não, mais fácil: Vamos simplesmente reescrever a função generateMultiAgentLevel para guardar os paths explicitamente,
+    // como fiz na v2.2. A versão acima estava simplificada demais.
+    
+    // RE-IMPLEMENTAÇÃO SEGURA COM PATH TRACKING:
+    let newGrid = Array(size).fill().map(() => Array(size).fill(-1));
+    let pathsData = Array(numPairs).fill().map(() => []); 
+    
+    // Escolhe Starts
     let available = [];
     for(let r=0; r<size; r++) for(let c=0; c<size; c++) available.push({r,c});
     available.sort(() => Math.random() - 0.5);
@@ -517,25 +500,21 @@ generateMultiAgentLevel = function(size, numPairs) {
     for(let i=0; i<numPairs; i++) {
         let pos = available.pop();
         newGrid[pos.r][pos.c] = i;
-        pathsData[i].push(pos); // O primeiro elemento é o Start
+        pathsData[i].push(pos); 
     }
 
-    // 2. Cresce
+    // Cresce
     let filledCount = numPairs;
     let stuck = Array(numPairs).fill(false);
     let active = true;
 
     while(active && filledCount < size*size) {
         active = false;
-        // Sorteia ordem para ser justo
         let order = Array.from({length: numPairs}, (_, k) => k).sort(() => Math.random() - 0.5);
         
         for(let i of order) {
             if(stuck[i]) continue;
-            
-            // Pega a ponta atual (cabeça)
             let head = pathsData[i][pathsData[i].length - 1];
-            
             let neighbors = [
                 {r: head.r-1, c: head.c}, {r: head.r+1, c: head.c},
                 {r: head.r, c: head.c-1}, {r: head.r, c: head.c+1}
@@ -555,11 +534,10 @@ generateMultiAgentLevel = function(size, numPairs) {
         }
     }
 
-    // 3. Validações
-    if(filledCount < size*size) return false; // Não preencheu tudo
-    if(pathsData.some(p => p.length < 3)) return false; // Caminhos muito curtos
+    if(filledCount < size*size) return false;
+    if(pathsData.some(p => p.length < 3)) return false;
 
-    // 4. Aplica ao Grid Real
+    // Aplica ao Grid Real
     gridSize = size;
     cellSize = canvas.width / gridSize;
     grid = [];
@@ -575,20 +553,14 @@ generateMultiAgentLevel = function(size, numPairs) {
         let start = p[0];
         let end = p[p.length-1];
 
-        // Configura Start
         grid[start.r][start.c].isEndpoint = true;
         grid[start.r][start.c].isStart = true;
         grid[start.r][start.c].pairIndex = i;
 
-        // Configura End
         grid[end.r][end.c].isEndpoint = true;
         grid[end.r][end.c].isStart = false;
         grid[end.r][end.c].pairIndex = i;
-        
-        // Limpa o meio (o jogador deve descobrir)
-        // As células do meio ficam vazias (pairIndex -1)
     }
-
     return true;
 }
 
