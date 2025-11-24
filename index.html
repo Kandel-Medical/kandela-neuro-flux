@@ -30,37 +30,6 @@
             height: 100vh;
         }
 
-                /* TELA DE ACESSO NEGADO (SEGURANÇA) */
-        #access-denied {
-            display: none; /* Oculto por padrão */
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #000;
-            z-index: 99999;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            padding: 20px;
-        }
-
-        #access-denied h1 {
-            color: #ff0055;
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
-            text-shadow: 0 0 10px #ff0055;
-            border-bottom: 2px solid #ff0055;
-            padding-bottom: 10px;
-        }
-
-        #access-denied p {
-            color: #fff;
-            font-size: 1.2rem;
-        }
-
         /* Efeito CRT/Scanline subtil */
         body::after {
             content: " ";
@@ -192,35 +161,50 @@
             border-color: #ff5555;
             color: #ff5555;
         }
+
+        /* TELA DE ACESSO NEGADO (SEGURANÇA) */
+        #access-denied {
+            display: none; /* Oculto por padrão */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            z-index: 99999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #access-denied h1 {
+            color: #ff0055;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 0 0 10px #ff0055;
+            border-bottom: 2px solid #ff0055;
+            padding-bottom: 10px;
+        }
+
+        #access-denied p {
+            color: #fff;
+            font-size: 1.2rem;
+        }
     </style>
 </head>
 <body>
 
     <!-- MENSAGEM DE SEGURANÇA (BLOQUEIO) -->
-<div id="access-denied">
-    <h1>🚫 ACESSO RESTRITO</h1>
-    <p>Protocolo de Segurança Ativado.</p>
-    <br>
-    <p style="color: #0ff; font-size: 1rem;">
-        Este módulo só pode ser acessado através da interface segura da <strong>Kandela</strong> no Telegram.
-    </p>
-</div>
-
-<!-- SCRIPT DE VERIFICAÇÃO (TRAVA LÓGICA) -->
-<script>
-    (function() {
-        const tg = window.Telegram.WebApp;
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const isTelegram = tg.initData && tg.initData.length > 0;
-
-        if (!isTelegram && !isLocal) {
-            document.getElementById('access-denied').style.display = 'flex';
-            const gameContainer = document.getElementById('game-container');
-            if (gameContainer) gameContainer.remove();
-            throw new Error("KANDELA SECURITY: Acesso externo não autorizado.");
-        }
-    })();
-</script>
+    <div id="access-denied">
+        <h1>🚫 ACESSO RESTRITO</h1>
+        <p>Protocolo de Segurança Ativado.</p>
+        <br>
+        <p style="color: #0ff; font-size: 1rem;">
+            Este módulo só pode ser acessado através da interface segura da <strong>Kandela</strong> no Telegram.
+        </p>
+    </div>
 
     <div id="ui-layer">
         <div>
@@ -251,11 +235,35 @@
 
 <script>
 /**
- * NEURO-FLUX v2.4
+ * NEURO-FLUX v2.4 (Security Patch)
  * Correção Crítica: Algoritmo de "Multi-Agent Growth" para garantir
  * que todo nível gerado tenha solução de 100% de preenchimento.
  * + Correção de vírgulas nos arrays de pares.
+ * + Trava de Segurança (Telegram Only)
  */
+
+// --- TRAVA DE SEGURANÇA KANDELA ---
+(function() {
+    const tg = window.Telegram.WebApp;
+    // Permite localhost e 127.0.0.1 para testes de desenvolvimento
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    // Verifica se há dados de inicialização do Telegram (indica que está rodando dentro do app)
+    const isTelegram = tg.initData && tg.initData.length > 0;
+
+    // Se NÃO estiver no Telegram E NÃO for local -> Bloqueia
+    if (!isTelegram && !isLocal) {
+        document.getElementById('access-denied').style.display = 'flex';
+        const gameContainer = document.getElementById('game-container');
+        const uiLayer = document.getElementById('ui-layer'); // Também remove a UI
+        const overlay = document.getElementById('overlay'); // E o overlay
+        
+        if (gameContainer) gameContainer.remove();
+        if (uiLayer) uiLayer.remove();
+        if (overlay) overlay.remove();
+        
+        throw new Error("KANDELA SECURITY: Acesso externo não autorizado.");
+    }
+})();
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -328,10 +336,10 @@ const THEMES = [
         ]
     },
     {
-        name: "Diagnósticos Diferenciais EMG",
+        name: "Diagnósticos Diferenciais",
         pairs: [
             ['#BD00FF', 'STC', 'Mediano'],    // Roxo
-            ['#FF8800', 'Radicular', 'Reflexo H'],      // Laranja (Ajustado para especificidade S1)
+            ['#FF8800', 'Radicular', 'Onda-H'],      // Laranja (Ajustado para especificidade S1)
             ['#FF0055', 'Miastenia', 'Decrem.'],   // Vermelho
             ['#00FF9D', 'TunelCubital', 'Ulnar'], // Verde (Typo corrigido)
             ['#00CCFF', 'ELA', 'MUNIX']  // Azul (Excelente!)
