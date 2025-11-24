@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kandela: Neuro-Flux Protocol</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: #050a0f;
+            --grid-line: #1a2f38;
+            --text-main: #00ff9d;
+            --text-dim: #008f58;
+            --text-warn: #ffbb00;
+            --glow: 0 0 10px rgba(0, 255, 157, 0.5);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Share Tech Mono', monospace;
+            overflow: hidden;
+            touch-action: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* Efeito CRT/Scanline subtil */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        #ui-layer {
+            z-index: 10;
+            width: 100%;
+            padding: 15px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(5, 10, 15, 0.95);
+            border-bottom: 1px solid var(--text-dim);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            font-size: 1.1rem;
+            margin: 0;
+            letter-spacing: 1px;
+            color: #fff;
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            color: var(--text-main);
+            opacity: 0.8;
+        }
+
+        .stats {
+            text-align: right;
+            font-size: 0.85rem;
+            color: var(--text-main);
+        }
+
+        #game-container {
+            position: relative;
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        canvas {
+            background: radial-gradient(circle at center, #0e1a26 0%, #000000 100%);
+            box-shadow: 0 0 25px rgba(0, 255, 157, 0.15);
+            border: 1px solid var(--text-dim);
+            border-radius: 8px;
+            z-index: 5;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 10, 15, 0.92);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            text-align: center;
+            backdrop-filter: blur(8px);
+            transition: opacity 0.3s;
+        }
+
+        .hidden { opacity: 0; pointer-events: none; }
+
+        button {
+            background: rgba(0, 255, 157, 0.1);
+            border: 1px solid var(--text-main);
+            color: var(--text-main);
+            padding: 15px 40px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            margin-top: 30px;
+            transition: all 0.2s;
+            border-radius: 4px;
+        }
+
+        button:active {
+            background: var(--text-main);
+            color: #000;
+            box-shadow: 0 0 20px var(--text-main);
+        }
+
+        .info-text {
+            max-width: 80%;
+            line-height: 1.6;
+            color: #ccc;
+        }
+
+        .highlight { color: var(--text-main); font-weight: bold; }
+
+        /* Notificações */
+        #toast {
+            position: absolute;
+            bottom: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid var(--text-main);
+            padding: 12px 24px;
+            border-radius: 4px;
+            color: var(--text-main);
+            z-index: 40;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            text-align: center;
+            white-space: nowrap;
+            font-weight: bold;
+        }
+        
+        #toast.error {
+            border-color: #ff5555;
+            color: #ff5555;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div>
+            <h1>NEURO-FLUX <span style="font-size:0.6em; vertical-align: super; opacity:0.7">v2.1</span></h1>
+            <div class="subtitle" id="level-title">Carregando Módulos...</div>
+        </div>
+        <div class="stats">
+            <div>FLUXO: <span id="coverage">0</span>%</div>
+            <div>NVL: <span id="level">1</span></div>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="toast">SINAL ESTABILIZADO</div>
+    </div>
+
+    <div id="overlay">
+        <h2 style="color: var(--text-main); font-size: 2rem; margin-bottom: 5px; text-shadow: var(--glow);">NEURO-FLUX</h2>
+        <div style="width: 50px; height: 2px; background: var(--text-main); margin-bottom: 20px;"></div>
+        <p class="info-text">
+            <span class="highlight">MISSÃO:</span> Restabelecer conexões neurais.<br><br>
+            Ligue o <span class="highlight">ESTÍMULO</span> (Nervo) à <span class="highlight">RESPOSTA</span> (Músculo/Cortex).<br>
+            <br>
+            <span style="font-size: 0.85em; opacity: 0.8">Preencha 100% da área para garantir integridade do sinal.</span>
+        </p>
+        <button id="startBtn">INICIAR EXAME</button>
+    </div>
+
+<script>
+/**
+ * NEURO-FLUX v2.1 - Logic Fix
+ * Correção: Implementação de vínculos explícitos (linked neighbors)
+ * para evitar "manchas" de cor e garantir caminhos únicos.
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const startBtn = document.getElementById('startBtn');
+const overlay = document.getElementById('overlay');
+const coverageDisplay = document.getElementById('coverage');
+const levelDisplay = document.getElementById('level');
+const levelTitle = document.getElementById('level-title');
+const toast = document.getElementById('toast');
+
+// --- Configuração de Temas Clínicos ---
+const THEMES = [
+    {
+        name: "MMSS: Motor Conduction",
+        pairs: [
+            ['#FF0055', 'Mediano', 'APB'],    // Vermelho
+            ['#00FF9D', 'Ulnar', 'ADM'],      // Verde
+            ['#00CCFF', 'Radial', 'EIP'],     // Azul
+            ['#FFFF00', 'MuscCut', 'Biceps']  // Amarelo
+        ]
+    },
+    {
+        name: "MMII: Motor & Reflexes",
+        pairs: [
+            ['#BD00FF', 'Fibular', 'EDB'],    // Roxo
+            ['#FF8800', 'Tibial', 'AH'],      // Laranja
+            ['#FF0055', 'Femoral', 'Quad'],   // Vermelho
+            ['#00FF9D', 'H-Reflex', 'Soleus'] // Verde
+        ]
+    },
+    {
+        name: "Sensory & Dermatomes",
+        pairs: [
+            ['#00CCFF', 'Dedo 2', 'Punho'],   // Mediano Sensitivo
+            ['#FFFF00', 'Dedo 5', 'Punho'],   // Ulnar Sensitivo
+            ['#FF8800', 'Sural', 'LatMal'],   // Sural (Bota)
+            ['#BD00FF', 'Radial', 'Tabac']    // Radial Superficial
+        ]
+    },
+    {
+        name: "Evoked Potentials (EP)",
+        pairs: [
+            ['#FF0055', 'Goggles', 'O1-Oz'],  // VEP
+            ['#00FF9D', 'Fones', 'Cz-A1'],    // AEP (BERA)
+            ['#00CCFF', 'Mediano', 'C3/C4'],  // SEP
+            ['#FFFF00', 'Tibial', 'Cz-Fz']    // SEP
+        ]
+    }
+];
+
+// --- Estado do Jogo ---
+let gridSize = 5;
+let cellSize = 0;
+let grid = []; 
+let currentLevel = 1;
+let currentTheme = null;
+let activePairs = []; 
+let paths = []; // Armazena a sequência ordenada de células para cada par (para facilitar o backtrack)
+
+// --- Interação ---
+let isDrawing = false;
+let activePairIndex = -1;
+let lastCell = null;
+
+// Classe Célula Atualizada
+class Cell {
+    constructor(r, c) {
+        this.r = r;
+        this.c = c;
+        this.pairIndex = -1; // -1 = vazio
+        this.isEndpoint = false;
+        this.isStart = false; 
+        // Links visuais para desenhar conexões exatas
+        this.links = { top: false, right: false, bottom: false, left: false };
+    }
+    
+    reset() {
+        if (!this.isEndpoint) {
+            this.pairIndex = -1;
+        }
+        this.links = { top: false, right: false, bottom: false, left: false };
+    }
+}
+
+// Inicialização
+function initGame() {
+    grid = Array(5).fill().map((_, r) => Array(5).fill().map((_, c) => new Cell(r, c)));
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    const startEvents = ['mousedown', 'touchstart'];
+    const moveEvents = ['mousemove', 'touchmove'];
+    const endEvents = ['mouseup', 'mouseleave', 'touchend'];
+
+    startEvents.forEach(evt => canvas.addEventListener(evt, handleStart, {passive: false}));
+    moveEvents.forEach(evt => canvas.addEventListener(evt, handleMove, {passive: false}));
+    endEvents.forEach(evt => canvas.addEventListener(evt, handleEnd));
+
+    startBtn.addEventListener('click', () => {
+        overlay.classList.add('hidden');
+        startLevel(1);
+    });
+
+    if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+    }
+}
+
+function resizeCanvas() {
+    const container = document.getElementById('game-container');
+    const size = Math.min(container.clientWidth, container.clientHeight) * 0.95;
+    canvas.width = size;
+    canvas.height = size;
+    cellSize = size / gridSize;
+    draw();
+}
+
+// --- Geração de Nível ---
+function startLevel(lvl) {
+    currentLevel = lvl;
+    levelDisplay.innerText = lvl;
+    const themeIdx = (lvl - 1) % THEMES.length;
+    currentTheme = THEMES[themeIdx];
+    levelTitle.innerText = currentTheme.name;
+
+    let size = 5;
+    let numPairs = 3; 
+
+    if (lvl > 2) { size = 5; numPairs = 4; }
+    if (lvl > 5) { size = 6; numPairs = 4; }
+    if (lvl > 8) { size = 7; numPairs = 5; }
+
+    activePairs = currentTheme.pairs.slice(0, numPairs);
+    // Inicializa estrutura de paths para controle de fluxo
+    paths = Array(numPairs).fill().map(() => []);
+
+    generateProceduralLevel(size, numPairs);
+}
+
+function generateProceduralLevel(size, numPairs) {
+    gridSize = size;
+    cellSize = canvas.width / gridSize;
+    grid = [];
+    paths = Array(numPairs).fill().map(() => []);
+    
+    // 1. Grid Vazia
+    for(let r=0; r<size; r++) {
+        let row = [];
+        for(let c=0; c<size; c++) row.push(new Cell(r, c));
+        grid.push(row);
+    }
+
+    // 2. Algoritmo Worm
+    let usedMap = Array(size).fill().map(() => Array(size).fill(false));
+    let availableCells = [];
+    for(let r=0; r<size; r++) for(let c=0; c<size; c++) availableCells.push({r,c});
+
+    let pairIdx = 0;
+    let fails = 0;
+
+    while(pairIdx < numPairs && fails < 200) {
+        let freeCells = availableCells.filter(c => !usedMap[c.r][c.c]);
+        if(freeCells.length === 0) break;
+
+        let start = freeCells[Math.floor(Math.random() * freeCells.length)];
+        let path = [start];
+        let curr = start;
+        usedMap[start.r][start.c] = true; 
+
+        let steps = 0;
+        let targetLength = Math.floor(Math.random() * (size * 1.5)) + 2; 
+
+        while(steps < targetLength) {
+            let neighbors = [
+                {r: curr.r-1, c: curr.c}, {r: curr.r+1, c: curr.c},
+                {r: curr.r, c: curr.c-1}, {r: curr.r, c: curr.c+1}
+            ].filter(n => 
+                n.r >= 0 && n.r < size && n.c >= 0 && n.c < size && !usedMap[n.r][n.c]
+            );
+
+            if(neighbors.length === 0) break;
+            
+            let next = neighbors[Math.floor(Math.random() * neighbors.length)];
+            usedMap[next.r][next.c] = true;
+            path.push(next);
+            curr = next;
+            steps++;
+        }
+
+        if(path.length < 3) {
+            path.forEach(p => usedMap[p.r][p.c] = false);
+            fails++;
+            continue;
+        }
+
+        let end = path[path.length-1];
+        
+        grid[start.r][start.c].isEndpoint = true;
+        grid[start.r][start.c].isStart = true;
+        grid[start.r][start.c].pairIndex = pairIdx;
+
+        grid[end.r][end.c].isEndpoint = true;
+        grid[end.r][end.c].isStart = false;
+        grid[end.r][end.c].pairIndex = pairIdx;
+
+        pairIdx++;
+    }
+
+    if(pairIdx < numPairs) {
+        generateProceduralLevel(size, numPairs);
+        return;
+    }
+
+    draw();
+    showToastMsg("Nível " + currentLevel + ": " + currentTheme.name.split(':')[0], false);
+}
+
+// --- Lógica de Input e Pathfinding ---
+function getPos(e) {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    const c = Math.floor((clientX - rect.left) / cellSize);
+    const r = Math.floor((clientY - rect.top) / cellSize);
+    return {r, c};
+}
+
+function handleStart(e) {
+    const pos = getPos(e);
+    if(pos.r < 0 || pos.r >= gridSize || pos.c < 0 || pos.c >= gridSize) return;
+    
+    const cell = grid[pos.r][pos.c];
+
+    if (cell.pairIndex !== -1) {
+        isDrawing = true;
+        activePairIndex = cell.pairIndex;
+        
+        // Se clicar no Endpoint, reseta o caminho
+        if (cell.isEndpoint) {
+            clearPath(activePairIndex);
+            // Inicia novo caminho
+            paths[activePairIndex] = [cell];
+            lastCell = cell;
+        } else {
+            // Se clicar no meio de um caminho existente
+            // Backtrack: cortar tudo que vem DEPOIS dessa célula
+            const pathArr = paths[activePairIndex];
+            const idx = pathArr.indexOf(cell);
+            
+            if (idx !== -1) {
+                // Remove visualmente os links e cores das células descartadas
+                for (let i = idx + 1; i < pathArr.length; i++) {
+                    const c = pathArr[i];
+                    if(!c.isEndpoint) {
+                        c.reset();
+                    } else {
+                        // Se for endpoint, apenas remove links
+                        c.links = { top: false, right: false, bottom: false, left: false };
+                    }
+                }
+                // Corta o array
+                paths[activePairIndex] = pathArr.slice(0, idx + 1);
+                
+                // Remove o link da célula atual para a próxima (que foi deletada)
+                // Precisamos limpar todos os links da célula atual para recalcular
+                cell.links = { top: false, right: false, bottom: false, left: false };
+                // Reconecta com o anterior se existir
+                if (idx > 0) {
+                    const prev = pathArr[idx-1];
+                    linkCells(prev, cell);
+                }
+                
+                lastCell = cell;
+            } else {
+                // Caso de erro ou clique em cor isolada: trata como novo start se possível ou ignora
+                // Para simplificar, só permite arrastar de partes válidas do path
+                isDrawing = false;
+            }
+        }
+        draw();
+    }
+}
+
+function handleMove(e) {
+    if (!isDrawing || !lastCell) return;
+    const pos = getPos(e);
+    if(pos.r < 0 || pos.r >= gridSize || pos.c < 0 || pos.c >= gridSize) return;
+
+    const cell = grid[pos.r][pos.c];
+
+    if (cell !== lastCell) {
+        // Validação 1: Ortogonalidade (Só vizinhos diretos)
+        const dr = Math.abs(cell.r - lastCell.r);
+        const dc = Math.abs(cell.c - lastCell.c);
+        if (dr + dc !== 1) return; // Se não for vizinho direto, ignora (evita pulos)
+
+        // Validação 2: Colisão
+        // Não pode passar por cima de endpoint de OUTRO par
+        if (cell.isEndpoint && cell.pairIndex !== activePairIndex) return;
+        // Não pode passar por cima de caminho de OUTRO par
+        if (!cell.isEndpoint && cell.pairIndex !== -1 && cell.pairIndex !== activePairIndex) return;
+
+        // Validação 3: Auto-colisão (Backtracking simples)
+        // Se voltarmos para a penúltima célula do path, é um recuo
+        const currentPath = paths[activePairIndex];
+        if (currentPath.length > 1 && currentPath[currentPath.length - 2] === cell) {
+            // Recuo: Apaga o link e a cor da lastCell
+            if (!lastCell.isEndpoint) lastCell.reset();
+            else lastCell.links = { top: false, right: false, bottom: false, left: false };
+            
+            // Atualiza path
+            currentPath.pop();
+            lastCell = cell;
+            
+            // Remove o link da célula atual para a que foi apagada
+            // Recalcula links do path restante é complexo, melhor limpar links desta célula
+            cell.links = { top: false, right: false, bottom: false, left: false };
+            if (currentPath.length > 1) {
+                linkCells(currentPath[currentPath.length - 2], cell);
+            }
+            
+            draw();
+            return;
+        }
+
+        // Validação 4: Loop fechado (tocar no próprio rastro fora o anterior)
+        if (currentPath.includes(cell)) return; // Impede círculo
+
+        // Movimento Válido: Avançar
+        cell.pairIndex = activePairIndex;
+        linkCells(lastCell, cell);
+        
+        currentPath.push(cell);
+        lastCell = cell;
+        
+        draw();
+        
+        // Se chegou no destino final
+        if (cell.isEndpoint) {
+            isDrawing = false; // Para de desenhar
+            checkWinCondition();
+        }
+    }
+}
+
+function linkCells(c1, c2) {
+    // Estabelece conexão bidirecional visual
+    if (c1.r === c2.r) { // Horizontal
+        if (c1.c < c2.c) { c1.links.right = true; c2.links.left = true; }
+        else { c1.links.left = true; c2.links.right = true; }
+    } else { // Vertical
+        if (c1.r < c2.r) { c1.links.bottom = true; c2.links.top = true; }
+        else { c1.links.top = true; c2.links.bottom = true; }
+    }
+}
+
+function handleEnd() {
+    if (isDrawing) {
+        isDrawing = false;
+        checkWinCondition();
+    }
+}
+
+function clearPath(pIdx) {
+    // Limpa grid visualmente
+    for(let r=0; r<gridSize; r++) {
+        for(let c=0; c<gridSize; c++) {
+            if(grid[r][c].pairIndex === pIdx) {
+                grid[r][c].links = { top: false, right: false, bottom: false, left: false };
+                if(!grid[r][c].isEndpoint) {
+                    grid[r][c].pairIndex = -1;
+                }
+            }
+        }
+    }
+    // Limpa memória do path
+    paths[pIdx] = []; 
+    // Se endpoints existem, precisam ser reinicializados no path
+    // Mas na lógica de 'handleStart', nós adicionamos o endpoint clicado.
+    // O outro endpoint fica orfão até ser conectado.
+}
+
+// --- Validação de Vitória ---
+function checkWinCondition() {
+    let filledCells = 0;
+    let totalCells = gridSize * gridSize;
+    let allConnected = true;
+
+    // Verifica cobertura
+    for(let r=0; r<gridSize; r++) {
+        for(let c=0; c<gridSize; c++) {
+            if(grid[r][c].pairIndex !== -1) filledCells++;
+        }
+    }
+    
+    // Verifica conexões
+    // Um par está completo se o path começa num endpoint e termina no outro endpoint
+    for (let i = 0; i < activePairs.length; i++) {
+        const p = paths[i];
+        if (p.length < 2) { allConnected = false; break; }
+        const start = p[0];
+        const end = p[p.length-1];
+        if (!start.isEndpoint || !end.isEndpoint || start === end) {
+            allConnected = false; break;
+        }
+    }
+
+    let percent = Math.floor((filledCells / totalCells) * 100);
+    coverageDisplay.innerText = percent;
+
+    if (allConnected) {
+        if (percent === 100) {
+            showToastMsg("SISTEMA SINCRONIZADO!", false);
+            setTimeout(() => {
+                startLevel(currentLevel + 1);
+            }, 1500);
+        } else {
+            showToastMsg("CIRCUITO INCOMPLETO: Ocupe os espaços vazios!", true);
+        }
+    }
+}
+
+function showToastMsg(msg, isError) {
+    toast.innerText = msg;
+    toast.className = isError ? 'error' : '';
+    toast.style.opacity = 1;
+    clearTimeout(window.toastTimer);
+    window.toastTimer = setTimeout(() => { toast.style.opacity = 0; }, 2500);
+}
+
+// --- Renderização ---
+function draw() {
+    // Limpa
+    ctx.fillStyle = '#050a0f';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (!grid || grid.length === 0) return;
+
+    // Grid Lines
+    ctx.strokeStyle = '#1a2f38';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for(let i=0; i<=gridSize; i++) {
+        ctx.moveTo(i * cellSize, 0); ctx.lineTo(i * cellSize, canvas.height);
+        ctx.moveTo(0, i * cellSize); ctx.lineTo(canvas.width, i * cellSize);
+    }
+    ctx.stroke();
+
+    // Desenha Caminhos Baseado em LINKS (Correção Visual)
+    ctx.lineCap = 'round';
+    
+    // Para cada célula, desenha as conexões "para fora" do centro
+    // Isso evita ter que iterar por pares. Iteramos pelo grid.
+    
+    for(let r=0; r<gridSize; r++) {
+        for(let c=0; c<gridSize; c++) {
+            const cell = grid[r][c];
+            if (cell.pairIndex !== -1) {
+                const color = activePairs[cell.pairIndex][0];
+                const cx = c * cellSize + cellSize/2;
+                const cy = r * cellSize + cellSize/2;
+                const halfCell = cellSize / 2;
+                const pipeWidth = cellSize * 0.4;
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth = pipeWidth;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 10;
+
+                // Desenha apenas as conexões que existem explicitamente
+                ctx.beginPath();
+                if (cell.links.right) {
+                    ctx.moveTo(cx, cy); ctx.lineTo(cx + halfCell, cy);
+                }
+                if (cell.links.left) {
+                    ctx.moveTo(cx, cy); ctx.lineTo(cx - halfCell, cy);
+                }
+                if (cell.links.bottom) {
+                    ctx.moveTo(cx, cy); ctx.lineTo(cx, cy + halfCell);
+                }
+                if (cell.links.top) {
+                    ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - halfCell);
+                }
+                
+                // Preenche o centro para ficar redondinho nas quinas
+                // Mas só se tiver alguma conexão ou for endpoint (para não ficar vazio no meio do movimento)
+                // Na verdade, endpoints são desenhados depois, mas curvas precisam de um 'join'
+                if (Object.values(cell.links).some(v=>v)) {
+                   // ctx.moveTo(cx, cy); ctx.lineTo(cx, cy); // Hack para lineCap round funcionar no centro?
+                   // Melhor desenhar um arco pequeno ou confiar no lineJoin se fosse path único
+                   // Como são segmentos separados, desenhamos um círculo central da mesma cor
+                   // para fundir os segmentos
+                   /* ctx.fillStyle = color;
+                   ctx.beginPath();
+                   ctx.arc(cx, cy, pipeWidth/2, 0, Math.PI*2);
+                   ctx.fill(); */
+                   // O 'stroke' já tem lineCap round, mas como desenhamos do centro pra fora, o centro fica ok se tiver 2 linhas opostas
+                   // Se for curva (top e right), o centro precisa de preenchimento.
+                }
+                ctx.stroke();
+                
+                // Correção para curvas suaves (tapa-buraco nas junções)
+                if (Object.values(cell.links).filter(v=>v).length > 0) {
+                     ctx.fillStyle = color;
+                     ctx.beginPath();
+                     ctx.arc(cx, cy, pipeWidth/2, 0, Math.PI*2);
+                     ctx.fill();
+                }
+                
+                ctx.shadowBlur = 0;
+            }
+        }
+    }
+
+    // Desenha Endpoints e Texto (Camada superior)
+    for(let r=0; r<gridSize; r++) {
+        for(let c=0; c<gridSize; c++) {
+            let cell = grid[r][c];
+            if(cell.isEndpoint) {
+                const pairData = activePairs[cell.pairIndex];
+                const color = pairData[0];
+                const label = cell.isStart ? pairData[1] : pairData[2]; 
+
+                let cx = c * cellSize + cellSize/2;
+                let cy = r * cellSize + cellSize/2;
+
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(cx, cy, cellSize * 0.35, 0, Math.PI*2);
+                ctx.fill();
+
+                ctx.fillStyle = '#fff';
+                let fontSize = Math.floor(cellSize * 0.22); 
+                ctx.font = `bold ${fontSize}px 'Share Tech Mono'`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.strokeText(label, cx, cy);
+                ctx.fillText(label, cx, cy);
+            }
+        }
+    }
+}
+
+// Start
+initGame();
+
+</script>
+</body>
+</html>
